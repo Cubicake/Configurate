@@ -22,6 +22,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.ConfigurationOptions;
+import org.spongepowered.configurate.RepresentationHint;
 import org.spongepowered.configurate.loader.AbstractConfigurationLoader;
 import org.spongepowered.configurate.loader.CommentHandler;
 import org.spongepowered.configurate.loader.CommentHandlers;
@@ -29,8 +30,6 @@ import org.spongepowered.configurate.util.UnmodifiableCollections;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.Constructor;
-import org.yaml.snakeyaml.representer.Representer;
 
 import java.io.BufferedReader;
 import java.io.Writer;
@@ -57,6 +56,25 @@ public final class YamlConfigurationLoader extends AbstractConfigurationLoader<C
             byte[].class, String.class, Date.class, java.sql.Date.class, Timestamp.class); // complex types
 
     /**
+     * The YAML scalar style this node should attempt to use.
+     *
+     * <p>If the chosen scalar style would produce syntactically invalid YAML, a
+     * valid one will replace it.</p>
+     *
+     * @since 4.2.0
+     */
+    public static final RepresentationHint<ScalarStyle> SCALAR_STYLE = RepresentationHint.of("configurate:yaml/scalarstyle", ScalarStyle.class);
+
+    /**
+     * The YAML node style to use for collection nodes. A {@code null} value
+     * will instruct the emitter to fall back to the
+     * {@link Builder#nodeStyle()} setting.
+     *
+     * @since 4.2.0
+     */
+    public static final RepresentationHint<NodeStyle> NODE_STYLE = RepresentationHint.of("configurate:yaml/nodestyle", NodeStyle.class);
+
+    /**
      * Creates a new {@link YamlConfigurationLoader} builder.
      *
      * @return a new builder
@@ -73,6 +91,10 @@ public final class YamlConfigurationLoader extends AbstractConfigurationLoader<C
      * <dl>
      *     <dt>&lt;prefix&gt;.yaml.node-style</dt>
      *     <dd>Equivalent to {@link #nodeStyle(NodeStyle)}</dd>
+     *     <dt>&lt;prefix&gt;.yaml.comments-enabled</dt>
+     *     <dd>Equivalent to {@link #commentsEnabled(boolean)}</dd>
+     *     <dt>&lt;prefix&gt;.yaml.line-length</dt>
+     *     <dd>Equivalent to {@link #lineLength(int)}</dd>
      * </dl>
      *
      * @since 4.0.0
@@ -105,6 +127,22 @@ public final class YamlConfigurationLoader extends AbstractConfigurationLoader<C
          * @since 4.2.0
          */
         public static final Option<Integer> INDENT = UNSAFE_SCHEMA.intOption("yaml:indent", 4);
+
+        /**
+         * Whether comments should be read from and written to YAML documents.
+         *
+         * @see #commentsEnabled(boolean)
+         * @since 4.2.0
+         */
+        public static final Option<Boolean> COMMENTS_ENABLED = UNSAFE_SCHEMA.booleanOption("yaml:comments_enabled", true);
+
+        /**
+         * The maximum length of lines in emitted documents.
+         *
+         * @see #lineLength(int)
+         * @since 4.2.0
+         */
+        public static final Option<Integer> LINE_LENGTH = UNSAFE_SCHEMA.intOption("yaml:line_length", 150);
 
         private final DumperOptions options = new DumperOptions();
 
@@ -181,6 +219,59 @@ public final class YamlConfigurationLoader extends AbstractConfigurationLoader<C
             return this.optionState().value(NODE_STYLE);
         }
 
+        /**
+         * Set whether comment handling is enabled on this loader.
+         *
+         * <p>When comment handling is enabled, comments will be read from files
+         * and written back to files where possible.</p>
+         *
+         * <p>The default value is {@code true}</p>
+         *
+         * @param enableComments whether comment handling should be enabled
+         * @return this builder (for chaining)
+         * @since 4.2.0
+         */
+        public Builder commentsEnabled(final boolean enableComments) {
+            this.optionStateBuilder().value(COMMENTS_ENABLED, enableComments);
+            return this;
+        }
+
+        /**
+         * Get whether comment handling is enabled.
+         *
+         * @return whether comment handling is enabled
+         * @see #commentsEnabled(boolean) for details on comment handling
+         * @since 4.2.0
+         */
+        public boolean commentsEnabled() {
+            return this.optionState().value(COMMENTS_ENABLED);
+        }
+
+        /**
+         * Set the maximum length of a configuration line.
+         *
+         * <p>The default value is {@code 150}</p>
+         *
+         * @param lineLength the maximum length of a configuration line
+         * @return this builder (for chaining)
+         * @since 4.2.0
+         */
+        public Builder lineLength(final int lineLength) {
+            this.optionStateBuilder().value(LINE_LENGTH, lineLength);
+            return this;
+        }
+
+        /**
+         * Get the maximum length of a configuration line.
+         *
+         * @return the maximum length of a configuration line
+         * @see #lineLength(int) for details on the line length
+         * @since 4.2.0
+         */
+        public int lineLength() {
+            return this.optionState().value(LINE_LENGTH);
+        }
+
         @Override
         public YamlConfigurationLoader build() {
             return new YamlConfigurationLoader(this);
@@ -194,24 +285,40 @@ public final class YamlConfigurationLoader extends AbstractConfigurationLoader<C
         super(builder, new CommentHandler[] {CommentHandlers.HASH});
         this.loaderOpts = new LoaderOptions()
             .setAcceptTabs(true)
-            .setProcessComments(false);
+            .setProcessComments(builder.commentsEnabled());
         this.loaderOpts.setCodePointLimit(Integer.MAX_VALUE);
 
         this.dumperOpts = builder.options;
         this.dumperOpts.setDefaultFlowStyle(NodeStyle.asSnakeYaml(builder.optionState().value(Builder.NODE_STYLE)));
-        this.dumperOpts.setIndent(builder.optionState().value(Builder.INDENT));
+        this.dumperOpts.setProcessComments(builder.commentsEnabled());
+        this.dumperOpts.setWidth(builder.lineLength());
+        this.dumperOpts.setIndent(builder.indent());
+        this.dumperOpts.setIndicatorIndent(builder.indent());
+        this.dumperOpts.setIndentWithIndicator(true);
     }
 
     @Override
     protected void loadInternal(final CommentedConfigurationNode node, final BufferedReader reader) {
-        final Yaml yaml = new Yaml(new Constructor(this.loaderOpts), new Representer(this.dumperOpts), this.dumperOpts, this.loaderOpts);
-        node.raw(yaml.load(reader));
+        final YamlConstructor constructor = new YamlConstructor(this.loaderOpts);
+        // The constructor needs configuration options for the nodes it creates.
+        constructor.options = node.options();
+        final Yaml yaml = new Yaml(constructor, new YamlRepresenter(true, this.dumperOpts), this.dumperOpts, this.loaderOpts);
+
+        @Nullable CommentedConfigurationNode loaded = yaml.load(reader);
+        // when a file exists but is empty (or if the file only exists of comments), the first event will be StreamEnd.
+        // getSingleNode will return null, getSingleData uses the Constructor of Tag Null, which just returns null.
+        // So we have to map null to an empty root node.
+        if (loaded == null) {
+            loaded = CommentedConfigurationNode.root(node.options());
+        }
+        node.from(loaded);
     }
 
     @Override
     protected void saveInternal(final ConfigurationNode node, final Writer writer) {
-        final Yaml yaml = new Yaml(new Constructor(this.loaderOpts), new Representer(this.dumperOpts), this.dumperOpts, this.loaderOpts);
-        yaml.dump(node.raw(), writer);
+        final Yaml yaml = new Yaml(
+            new YamlConstructor(this.loaderOpts), new YamlRepresenter(true, this.dumperOpts), this.dumperOpts, this.loaderOpts);
+        yaml.dump(node, writer);
     }
 
     @Override
