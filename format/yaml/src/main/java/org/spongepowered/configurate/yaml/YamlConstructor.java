@@ -91,7 +91,7 @@ class YamlConstructor extends Constructor {
                     .comment(commentFor(tuple.getKeyNode().getBlockComments()));
             }
 
-            return node.comment(commentFor(yamlNode.getBlockComments()));
+            return this.setComments(node, yamlNode);
         }
 
         final Object raw = super.constructObjectNoCheck(yamlNode);
@@ -112,7 +112,12 @@ class YamlConstructor extends Constructor {
             node.raw(raw);
         }
 
-        return node.comment(commentFor(yamlNode.getBlockComments()));
+        return this.setComments(node, yamlNode);
+    }
+
+    private CommentedConfigurationNode setComments(final CommentedConfigurationNode node, final Node yamlNode) {
+        return node.comment(commentFor(yamlNode.getBlockComments()))
+            .hint(YamlConfigurationLoader.END_COMMENT, commentFor(yamlNode.getEndComments()));
     }
 
     private static @Nullable String commentFor(final @Nullable List<CommentLine> commentLines) {

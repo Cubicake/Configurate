@@ -74,6 +74,13 @@ public final class YamlConfigurationLoader extends AbstractConfigurationLoader<C
      */
     public static final RepresentationHint<NodeStyle> NODE_STYLE = RepresentationHint.of("configurate:yaml/nodestyle", NodeStyle.class);
 
+    /** Comments parsed after the final node in a document. */
+    static final RepresentationHint<String> END_COMMENT = RepresentationHint.<String>builder()
+        .identifier("configurate:yaml/end-comment")
+        .valueType(String.class)
+        .inheritable(false)
+        .build();
+
     /**
      * Creates a new {@link YamlConfigurationLoader} builder.
      *

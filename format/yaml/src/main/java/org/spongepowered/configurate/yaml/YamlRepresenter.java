@@ -117,6 +117,15 @@ final class YamlRepresenter extends Representer {
                             .collect(Collectors.toList())
                     );
                 }
+                final @Nullable String endComment
+                    = node.ownHint(YamlConfigurationLoader.END_COMMENT);
+                if (endComment != null) {
+                    yamlNode.setEndComments(
+                        Arrays.stream(CONFIGURATE_LINE_PATTERN.split(endComment))
+                            .map(this::commentLineFor)
+                            .collect(Collectors.toList())
+                    );
+                }
             }
 
             return yamlNode;

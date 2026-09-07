@@ -224,6 +224,14 @@ class YamlConfigurationLoaderTest {
     }
 
     @Test
+    void testReadWriteEndComments() throws ConfigurateException {
+        final String input = "value: content\n# end of document\n";
+        final ConfigurationNode node = YamlConfigurationLoader.builder().buildAndLoadString(input);
+
+        assertEquals(input, YamlConfigurationLoader.builder().buildAndSaveString(node));
+    }
+
+    @Test
     void testComplexKeys() throws ConfigurateException {
         final URL source = this.resource("complex-keys.yaml");
         final CommentedConfigurationNode node = YamlConfigurationLoader.builder()
