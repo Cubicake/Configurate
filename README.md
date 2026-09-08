@@ -1,3 +1,8 @@
+This is a fork of Configurate tracking upstreams from [SpongePowered](https://github.com/spongepowered/configurate) and [Tim203](https://github.com/Tim203/Configurate).
+Its goal is to provide a drop-in replacement for the configurate-yaml loader with improved yaml round-tripping.
+
+Most of the yaml improvements are from Tim203's fork, which provides partial preservation of comments.
+
 # [Configurate](https://configurate.aoeu.xyz/) 
 
 ![GitHub Workflow Status (branch)](https://img.shields.io/github/actions/workflow/status/SpongePowered/Configurate/test-build.yml?branch=trunk)
